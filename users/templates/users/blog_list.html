@@ -1,0 +1,51 @@
+{% extends 'users/base.html' %}
+
+{% block title %}Blog Posts - Dating Forum{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2>Blog Posts</h2>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'users:create_blog_post' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> New Post
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        {% for post in posts %}
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ post.title }}</h5>
+                        <p class="card-text text-muted small">
+                            <i class="fas fa-user"></i> {{ post.user.username }} &bull;
+                            <i class="fas fa-clock"></i> {{ post.created_at|date:"F j, Y" }}
+                        </p>
+                        <p class="card-text">{{ post.content|truncatewords:50 }}</p>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a href="{% url 'users:profile_detail' post.user.id %}" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-user"></i> View Profile
+                            </a>
+                            <a href="{% url 'users:blog_detail' post.id %}" class="btn btn-primary btn-sm">
+                                Read More
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> No blog posts yet. Be the first to write one!
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Room</title>
+</head>
+<body>
+    <h2>Chat with {{ receiver.username }}</h2>
+    <div id="chat-box">
+        {% for message in messages %}
+            <p><strong>{{ message.sender.username }}:</strong> {{ message.content }} <em>({{ message.timestamp }})</em></p>
+        {% empty %}
+            <p>No messages yet.</p>
+        {% endfor %}
+    </div>
+    <form method="POST">
+        {% csrf_token %}
+        <textarea name="content" rows="3" cols="50" placeholder="Type your message..."></textarea><br>
+        <button type="submit">Send</button>
+    </form>
+    <a href="{% url 'profile' user_id=receiver.id %}">Back to Profile</a>
+</body>
+</html>

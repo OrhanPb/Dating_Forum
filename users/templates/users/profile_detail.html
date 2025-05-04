@@ -1,0 +1,92 @@
+{% extends 'users/base.html' %}
+
+{% block title %}{{ profile.user.username }}'s Profile - Dating Forum{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4 text-center">
+                    {% if profile.profile_picture %}
+                    <img src="{{ profile.profile_picture.url }}" alt="{{ profile.user.username }}" class="img-fluid rounded-circle mb-3" style="width: 200px; height: 200px; object-fit: cover;">
+                    {% else %}
+                    <div class="bg-light rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 200px; height: 200px;">
+                        <i class="fas fa-user fa-4x text-muted"></i>
+                    </div>
+                    {% endif %}
+                    
+                    <h3 class="mb-2">{{ profile.user.username }}</h3>
+                    {% if profile.is_online %}
+                    <span class="badge bg-success mb-3">Online</span>
+                    {% endif %}
+                    
+                    {% if user != profile.user %}
+                        {% if is_matched %}
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'users:chat_room' profile.user.id %}" class="btn btn-success">
+                                <i class="fas fa-comment"></i> Chat Now
+                            </a>
+                        </div>
+                        {% else %}
+                        <form method="post" action="{% url 'users:like_profile' profile.user.id %}" class="d-grid gap-2">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-heart"></i> Like Profile
+                            </button>
+                        </form>
+                        {% endif %}
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-8">
+                    <div class="row mb-4">
+                        <div class="col-sm-6">
+                            <div class="card bg-light border-0">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2 text-muted"><i class="fas fa-birthday-cake"></i> Age</h6>
+                                    <h5 class="card-title mb-0">{{ profile.age }} years</h5>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="card bg-light border-0">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2 text-muted"><i class="fas fa-venus-mars"></i> Gender</h6>
+                                    <h5 class="card-title mb-0">{{ profile.gender }}</h5>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h4 class="mb-3">About Me</h4>
+                    {% if profile.bio %}
+                    <p class="mb-4">{{ profile.bio }}</p>
+                    {% else %}
+                    <p class="text-muted mb-4">No bio available</p>
+                    {% endif %}
+                    
+                    <h4 class="mb-3">Interests</h4>
+                    {% if profile.interests.all %}
+                    <div class="mb-4">
+                        {% for interest in profile.interests.all %}
+                        <span class="badge bg-primary me-2 mb-2">{{ interest.name }}</span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-4">No interests listed</p>
+                    {% endif %}
+                    
+                    {% if profile.location_name %}
+                    <h4 class="mb-3">Location</h4>
+                    <p class="mb-4">
+                        <i class="fas fa-map-marker-alt text-primary"></i>
+                        {{ profile.location_name }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,62 @@
+{% extends 'users/base.html' %}
+
+{% block title %}Your Matches - Dating Forum{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Your Matches</h2>
+
+    {% if matches %}
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+            {% for match in matches %}
+                {% with matched_user=match.get_other_user_for_match %}
+                <div class="col">
+                    <div class="card h-100 shadow-sm">
+                        {% if matched_user.userprofile.profile_picture %}
+                            <img src="{{ matched_user.userprofile.profile_picture.url }}" class="card-img-top" alt="{{ matched_user.username }}'s profile picture">
+                        {% else %}
+                            <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+                                <i class="fas fa-user fa-4x text-secondary"></i>
+                            </div>
+                        {% endif %}
+                        
+                        <div class="card-body">
+                            <h5 class="card-title d-flex justify-content-between align-items-center">
+                                {{ matched_user.username }}
+                                {% if matched_user.userprofile.is_online %}
+                                    <span class="badge bg-success">Online</span>
+                                {% endif %}
+                            </h5>
+                            <p class="card-text">
+                                <i class="fas fa-birthday-cake"></i> {{ matched_user.userprofile.age }} years old<br>
+                                <i class="fas fa-venus-mars"></i> {{ matched_user.userprofile.gender }}<br>
+                                <i class="fas fa-map-marker-alt"></i> Within {{ matched_user.userprofile.preferred_distance }} km
+                            </p>
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <div class="d-grid gap-2">
+                                <a href="{% url 'users:profile_detail' matched_user.id %}" class="btn btn-primary">
+                                    <i class="fas fa-user"></i> View Profile
+                                </a>
+                                <a href="{% url 'users:chat_room' matched_user.id %}" class="btn btn-success">
+                                    <i class="fas fa-comment"></i> Chat Now
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endwith %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> You don't have any matches yet. Keep exploring profiles and liking people to find your matches!
+        </div>
+        <div class="text-center mt-4">
+            <a href="{% url 'users:search' %}" class="btn btn-primary btn-lg">
+                <i class="fas fa-search"></i> Find Matches
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %} 

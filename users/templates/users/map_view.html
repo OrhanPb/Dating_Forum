@@ -1,0 +1,331 @@
+{% extends 'users/base.html' %}
+
+{% block title %}Map View - Dating Forum{% endblock %}
+
+{% block extra_css %}
+<style>
+    #map {
+        height: 600px;
+        width: 100%;
+        border-radius: 8px;
+        margin-top: 20px;
+    }
+    
+    .map-controls {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .user-marker-info {
+        padding: 10px;
+        max-width: 200px;
+    }
+    
+    .user-marker-info img {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        object-fit: cover;
+        margin-bottom: 10px;
+    }
+    
+    .online-status {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 5px;
+    }
+    
+    .online-status.online {
+        background: #28a745;
+    }
+    
+    .online-status.offline {
+        background: #dc3545;
+    }
+
+    .map-error {
+        display: none;
+        padding: 20px;
+        margin: 20px 0;
+        border-radius: 8px;
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h2 class="mb-4">Find Matches on Map</h2>
+            
+            <div class="map-error" id="mapError">
+                <h4><i class="fas fa-exclamation-triangle"></i> Map Error</h4>
+                <p id="mapErrorMessage">There was an error loading the map. Please try again later.</p>
+            </div>
+            
+            <div class="map-controls">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label for="distance" class="form-label">Distance (km)</label>
+                        <input type="number" class="form-control" id="distance" value="50" min="1" max="500">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="gender" class="form-label">Gender</label>
+                        <select class="form-select" id="gender">
+                            <option value="Both">Both</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="ageMin" class="form-label">Min Age</label>
+                        <input type="number" class="form-control" id="ageMin" value="18" min="18" max="100">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="ageMax" class="form-label">Max Age</label>
+                        <input type="number" class="form-control" id="ageMax" value="100" min="18" max="100">
+                    </div>
+                </div>
+            </div>
+            
+            <div id="map"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let map;
+let markers = [];
+let currentInfoWindow = null;
+const defaultLocation = { lat: 41.0082, lng: 28.9784 }; // Default to Istanbul coordinates
+
+function showError(message) {
+    const errorDiv = document.getElementById('mapError');
+    const errorMessage = document.getElementById('mapErrorMessage');
+    errorMessage.textContent = message;
+    errorDiv.style.display = 'block';
+    document.getElementById('map').style.display = 'none';
+}
+
+function hideError() {
+    document.getElementById('mapError').style.display = 'none';
+    document.getElementById('map').style.display = 'block';
+}
+
+function initMap() {
+    console.log('Initializing map...');
+    
+    if (!window.google || !window.google.maps) {
+        showError('Google Maps failed to load. Please check your API key configuration.');
+        return;
+    }
+    
+    hideError();
+    
+    // Create map centered on default location
+    map = new google.maps.Map(document.getElementById('map'), {
+        zoom: 11,
+        center: defaultLocation,
+        styles: [
+            {
+                featureType: "poi",
+                elementType: "labels",
+                stylers: [{ visibility: "off" }]
+            }
+        ]
+    });
+    
+    // Try to get user's location
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                console.log('Got user location:', position.coords);
+                const pos = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                
+                // Store user's location in session
+                fetch('/users/update-location/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        latitude: pos.lat,
+                        longitude: pos.lng
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Location update response:', data);
+                    if (data.status === 'success') {
+                        map.setCenter(pos);
+                        loadUsers();
+                    } else {
+                        showError('Failed to update your location. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating location:', error);
+                    showError('Failed to update your location. Please try again.');
+                });
+            },
+            (error) => {
+                console.error('Error getting location:', error);
+                showError('Failed to get your location. Please enable location services and try again.');
+                loadUsers(); // Still try to load users even if location fails
+            }
+        );
+    } else {
+        console.log('Geolocation not supported');
+        showError('Your browser does not support geolocation. Some features may be limited.');
+        loadUsers();
+    }
+    
+    // Add event listeners for filters
+    document.getElementById('distance').addEventListener('change', loadUsers);
+    document.getElementById('gender').addEventListener('change', loadUsers);
+    document.getElementById('ageMin').addEventListener('change', loadUsers);
+    document.getElementById('ageMax').addEventListener('change', loadUsers);
+}
+
+function loadUsers() {
+    if (!map) {
+        console.error('Map not initialized');
+        return;
+    }
+    
+    console.log('Loading users...');
+    hideError();
+    
+    // Clear existing markers
+    markers.forEach(marker => marker.setMap(null));
+    markers = [];
+    
+    // Get filter values
+    const distance = document.getElementById('distance').value;
+    const gender = document.getElementById('gender').value;
+    const ageMin = document.getElementById('ageMin').value;
+    const ageMax = document.getElementById('ageMax').value;
+    
+    // Show loading state
+    const mapElement = document.getElementById('map');
+    mapElement.style.opacity = '0.6';
+    
+    // Fetch users
+    fetch(`/users/api/map-users/?distance=${distance}&gender=${gender}&age_min=${ageMin}&age_max=${ageMax}`, {
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Received users data:', data);
+        mapElement.style.opacity = '1';
+        
+        if (data.error) {
+            console.error('Server error:', data.error);
+            showError(data.error);
+            return;
+        }
+        
+        if (!data.users || data.users.length === 0) {
+            showError('No users found in the selected area. Try adjusting your filters.');
+            return;
+        }
+        
+        hideError();
+        data.users.forEach(user => {
+            console.log('Creating marker for user:', user.username);
+            
+            const marker = new google.maps.Marker({
+                position: { lat: user.latitude, lng: user.longitude },
+                map: map,
+                title: user.username,
+                label: {
+                    text: user.username,
+                    color: "#FFFFFF",
+                    fontSize: "14px",
+                    fontWeight: "bold"
+                },
+                icon: {
+                    url: user.is_online ? 
+                        'https://maps.google.com/mapfiles/ms/icons/green-dot.png' : 
+                        'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+                    labelOrigin: new google.maps.Point(15, -10)
+                }
+            });
+            
+            if (currentInfoWindow) {
+                currentInfoWindow.close();
+            }
+            
+            const infowindow = new google.maps.InfoWindow({
+                content: `
+                    <div class="user-marker-info">
+                        ${user.profile_picture ? 
+                            `<img src="${user.profile_picture}" alt="${user.username}">` :
+                            '<div class="default-avatar"><i class="fas fa-user fa-3x"></i></div>'
+                        }
+                        <h5>${user.username}</h5>
+                        <p>
+                            <span class="online-status ${user.is_online ? 'online' : 'offline'}"></span>
+                            ${user.is_online ? 'Online' : 'Offline'}
+                        </p>
+                        <p>${user.age} years old • ${user.gender}</p>
+                        <p><i class="fas fa-map-marker-alt"></i> ${user.location_name || 'Unknown location'}</p>
+                        <p>${Math.round(user.distance)} km away</p>
+                        <a href="/users/profile/${user.id}" class="btn btn-primary btn-sm">View Profile</a>
+                    </div>
+                `
+            });
+            
+            marker.addListener('click', () => {
+                if (currentInfoWindow) {
+                    currentInfoWindow.close();
+                }
+                infowindow.open(map, marker);
+                currentInfoWindow = infowindow;
+            });
+            
+            markers.push(marker);
+        });
+    })
+    .catch(error => {
+        console.error('Error loading users:', error);
+        showError('Failed to load users. Please try again later.');
+        mapElement.style.opacity = '1';
+    });
+}
+
+// Load Google Maps script dynamically
+document.addEventListener('DOMContentLoaded', function() {
+    const apiKey = '{{ google_maps_api_key }}';
+    if (!apiKey) {
+        showError('Google Maps API key is not configured. Please contact the administrator.');
+        return;
+    }
+    
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=initMap`;
+    script.async = true;
+    script.defer = true;
+    script.onerror = () => {
+        showError('Failed to load Google Maps. Please check your internet connection and try again.');
+    };
+    document.head.appendChild(script);
+});
+</script>
+{% endblock %} 

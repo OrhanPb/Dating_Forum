@@ -1,0 +1,512 @@
+{% extends 'users/base.html' %}
+
+{% block title %}Search Matches - Dating Forum{% endblock %}
+
+{% block extra_css %}
+<style>
+    .search-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+        color: white;
+        padding: 2rem 0;
+        margin: -1.5rem -15px 2rem;
+        border-radius: 0 0 2rem 2rem;
+    }
+
+    .filter-card {
+        position: sticky;
+        top: 5rem;
+    }
+
+    #map-container {
+        height: 600px;
+        margin-bottom: 2rem;
+        border-radius: 1rem;
+        overflow: hidden;
+        position: relative;
+    }
+
+    #map {
+        height: 100%;
+        width: 100%;
+    }
+
+    .map-error {
+        display: none;
+        padding: 20px;
+        margin: 20px 0;
+        border-radius: 8px;
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+        background: white;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+
+    .map-controls {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 1;
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .profile-card {
+        height: 100%;
+        transition: all 0.3s ease;
+    }
+
+    .profile-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .profile-image {
+        height: 250px;
+        object-fit: cover;
+        border-radius: 1rem 1rem 0 0;
+    }
+
+    .profile-image-placeholder {
+        height: 250px;
+        background: linear-gradient(45deg, #f1f1f1, #e9ecef);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 1rem 1rem 0 0;
+    }
+
+    .online-badge {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        padding: 0.5rem 1rem;
+        border-radius: 2rem;
+        background: rgba(25, 135, 84, 0.9);
+        color: white;
+        font-weight: 500;
+    }
+
+    .profile-info {
+        padding: 1.5rem;
+    }
+
+    .profile-meta {
+        color: var(--secondary-color);
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+
+    .profile-meta i {
+        color: var(--primary-color);
+        width: 20px;
+        text-align: center;
+        margin-right: 0.5rem;
+    }
+
+    .profile-bio {
+        color: var(--secondary-color);
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+    }
+
+    .profile-interests {
+        margin-bottom: 1.5rem;
+    }
+
+    .interest-badge {
+        background-color: rgba(255, 75, 110, 0.1);
+        color: var(--primary-color);
+        border: 1px solid var(--primary-color);
+        padding: 0.5rem 1rem;
+        border-radius: 2rem;
+        margin: 0.25rem;
+        display: inline-block;
+        font-size: 0.9rem;
+    }
+
+    .user-popup {
+        padding: 15px;
+        max-width: 250px;
+    }
+
+    .user-popup img {
+        width: 100%;
+        height: 150px;
+        object-fit: cover;
+        border-radius: 8px;
+        margin-bottom: 10px;
+    }
+
+    .user-popup h5 {
+        margin-bottom: 10px;
+    }
+
+    .user-popup p {
+        margin-bottom: 15px;
+        font-size: 0.9rem;
+    }
+
+    .user-popup i {
+        width: 20px;
+        text-align: center;
+        margin-right: 5px;
+        color: var(--primary-color);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="search-header">
+    <div class="container">
+        <h1 class="display-4 mb-2">Find Your Match</h1>
+        <p class="lead mb-0">Discover people who share your interests and values</p>
+    </div>
+</div>
+
+<div class="container py-4">
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <ul class="nav nav-tabs mb-4" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" data-bs-toggle="tab" href="#list-view">
+                        <i class="fas fa-list"></i> List View
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#map-view">
+                        <i class="fas fa-map-marker-alt"></i> Map View
+                    </a>
+                </li>
+            </ul>
+
+            <form method="get" class="mb-4" id="search-form">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Search</label>
+                        <input type="text" name="q" class="form-control" value="{{ query }}" placeholder="Search by username, bio, or interests">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Gender</label>
+                        <select name="gender" class="form-select">
+                            <option value="Both" {% if gender == 'Both' %}selected{% endif %}>Any</option>
+                            <option value="Male" {% if gender == 'Male' %}selected{% endif %}>Male</option>
+                            <option value="Female" {% if gender == 'Female' %}selected{% endif %}>Female</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Min Age</label>
+                        <input type="number" name="age_min" class="form-control" value="{{ age_min }}" min="18" max="100">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Max Age</label>
+                        <input type="number" name="age_max" class="form-control" value="{{ age_max }}" min="18" max="100">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Distance (km)</label>
+                        <input type="number" name="distance" class="form-control" value="{{ distance }}" min="1">
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="list-view">
+                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                        {% for profile in profiles %}
+                        <div class="col">
+                            <div class="card h-100">
+                                {% if profile.profile_picture %}
+                                <img src="{{ profile.profile_picture.url }}" class="card-img-top" alt="{{ profile.user.username }}'s picture" style="height: 200px; object-fit: cover;">
+                                {% else %}
+                                <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+                                    <i class="fas fa-user fa-4x text-muted"></i>
+                                </div>
+                                {% endif %}
+                                
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h5 class="card-title mb-0">{{ profile.user.username }}</h5>
+                                        {% if profile.is_online %}
+                                        <span class="badge bg-success">Online</span>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <p class="card-text">
+                                        <i class="fas fa-birthday-cake"></i> {{ profile.age }} years<br>
+                                        <i class="fas fa-venus-mars"></i> {{ profile.gender }}<br>
+                                        {% if profile.distance %}
+                                        <i class="fas fa-map-marker-alt"></i> {{ profile.distance|floatformat:1 }} km away
+                                        {% endif %}
+                                    </p>
+                                    
+                                    {% if profile.interests.all %}
+                                    <div class="mb-2">
+                                        {% for interest in profile.interests.all|slice:":3" %}
+                                        <span class="badge bg-primary">{{ interest.name }}</span>
+                                        {% endfor %}
+                                        {% if profile.interests.all|length > 3 %}
+                                        <span class="badge bg-secondary">+{{ profile.interests.all|length|add:"-3" }}</span>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <div class="d-grid gap-2">
+                                        <a href="{% url 'users:profile_detail' profile.user.id %}" class="btn btn-outline-primary">
+                                            <i class="fas fa-user"></i> View Profile
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> No matches found. Try adjusting your search criteria.
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="map-view">
+                    <div id="map-container">
+                        <div id="map"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let map;
+let markers = [];
+let currentInfoWindow = null;
+
+function showError(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'map-error';
+    errorDiv.innerHTML = `
+        <h4><i class="fas fa-exclamation-triangle"></i> Map Error</h4>
+        <p>${message}</p>
+    `;
+    document.getElementById('map-container').appendChild(errorDiv);
+    document.getElementById('map').style.opacity = '0.3';
+}
+
+function hideError() {
+    const errorDiv = document.querySelector('.map-error');
+    if (errorDiv) {
+        errorDiv.remove();
+    }
+    document.getElementById('map').style.opacity = '1';
+}
+
+function initMap() {
+    console.log('Initializing map...');
+    
+    if (!window.google || !window.google.maps) {
+        showError('Google Maps failed to load. Please check your internet connection and try again.');
+        return;
+    }
+    
+    hideError();
+    
+    // Default to Istanbul coordinates
+    const defaultLocation = { lat: 41.0082, lng: 28.9784 };
+    
+    map = new google.maps.Map(document.getElementById('map'), {
+        zoom: 11,
+        center: defaultLocation,
+        styles: [
+            {
+                featureType: "poi",
+                elementType: "labels",
+                stylers: [{ visibility: "off" }]
+            }
+        ]
+    });
+    
+    // Try to get user's location
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                console.log('Got user location:', position.coords);
+                const pos = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                
+                // Update user's location in the database
+                fetch('/users/update-location/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        latitude: pos.lat,
+                        longitude: pos.lng
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Location update response:', data);
+                    if (data.status === 'success') {
+                        map.setCenter(pos);
+                        updateMarkers();
+                    } else {
+                        console.error('Failed to update location:', data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating location:', error);
+                });
+            },
+            (error) => {
+                console.error('Error getting location:', error);
+                updateMarkers(); // Still try to show markers
+            }
+        );
+    } else {
+        console.log('Geolocation not supported');
+        updateMarkers();
+    }
+}
+
+function updateMarkers() {
+    if (!map) {
+        console.error('Map not initialized');
+        return;
+    }
+    
+    console.log('Updating markers...');
+    
+    // Clear existing markers
+    markers.forEach(marker => marker.setMap(null));
+    markers = [];
+    
+    let hasValidMarkers = false;
+    
+    // Add markers for each profile
+    {% for profile in profiles %}
+    {% if profile.latitude and profile.longitude %}
+    try {
+        const lat = parseFloat("{{ profile.latitude }}");
+        const lng = parseFloat("{{ profile.longitude }}");
+        
+        if (!isNaN(lat) && !isNaN(lng)) {
+            hasValidMarkers = true;
+            const marker = new google.maps.Marker({
+                position: { lat, lng },
+                map: map,
+                title: "{{ profile.user.username }}",
+                icon: {
+                    url: {% if profile.is_online %}
+                        'https://maps.google.com/mapfiles/ms/icons/green-dot.png'
+                    {% else %}
+                        'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
+                    {% endif %},
+                    labelOrigin: new google.maps.Point(15, -10)
+                },
+                label: {
+                    text: "{{ profile.user.username }}",
+                    color: "#FFFFFF",
+                    fontSize: "14px",
+                    fontWeight: "bold"
+                }
+            });
+            
+            const content = `
+                <div class="user-popup">
+                    {% if profile.profile_picture %}
+                        <img src="{{ profile.profile_picture.url }}" alt="{{ profile.user.username }}">
+                    {% else %}
+                        <div class="profile-image-placeholder">
+                            <i class="fas fa-user fa-3x text-muted"></i>
+                        </div>
+                    {% endif %}
+                    <h5>{{ profile.user.username }}</h5>
+                    <p>
+                        <span class="online-status {% if profile.is_online %}online{% else %}offline{% endif %}"></span>
+                        {{ profile.is_online|yesno:"Online,Offline" }}
+                    </p>
+                    <p>
+                        <i class="fas fa-birthday-cake"></i> {{ profile.age }} years<br>
+                        <i class="fas fa-venus-mars"></i> {{ profile.gender }}<br>
+                        <i class="fas fa-map-marker-alt"></i> {{ profile.distance|floatformat:1 }} km away
+                    </p>
+                    <a href="{% url 'users:profile_detail' profile.user.id %}" class="btn btn-primary btn-sm w-100">View Profile</a>
+                </div>
+            `;
+            
+            const infoWindow = new google.maps.InfoWindow({ content });
+            
+            marker.addListener('click', () => {
+                if (currentInfoWindow) {
+                    currentInfoWindow.close();
+                }
+                infoWindow.open(map, marker);
+                currentInfoWindow = infoWindow;
+            });
+            
+            markers.push(marker);
+        }
+    } catch (error) {
+        console.error('Error creating marker:', error);
+    }
+    {% endif %}
+    {% endfor %}
+    
+    if (!hasValidMarkers) {
+        console.log('No valid markers to display');
+    }
+}
+
+// Load Google Maps script when the map tab is shown
+document.querySelector('a[data-bs-toggle="tab"][href="#map-view"]').addEventListener('shown.bs.tab', function (e) {
+    if (!window.google) {
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap`;
+        script.async = true;
+        script.defer = true;
+        script.onerror = () => {
+            showError('Failed to load Google Maps. Please check your internet connection and try again.');
+        };
+        document.head.appendChild(script);
+    } else if (!map) {
+        initMap();
+    }
+});
+
+// Re-initialize map when switching tabs
+document.querySelectorAll('a[data-bs-toggle="tab"]').forEach(tab => {
+    tab.addEventListener('shown.bs.tab', function (e) {
+        if (e.target.getAttribute('href') === '#map-view' && map) {
+            google.maps.event.trigger(map, 'resize');
+            if (markers.length > 0) {
+                const bounds = new google.maps.LatLngBounds();
+                markers.forEach(marker => bounds.extend(marker.getPosition()));
+                map.fitBounds(bounds);
+                if (map.getZoom() > 15) {
+                    map.setZoom(15);
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %} 

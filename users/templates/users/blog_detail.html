@@ -1,0 +1,181 @@
+{% extends 'users/base.html' %}
+
+{% block title %}{{ post.title }} - Dating Forum{% endblock %}
+
+{% block extra_css %}
+<style>
+    .blog-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+        color: white;
+        padding: 3rem 0;
+        margin: -1.5rem -15px 2rem;
+        border-radius: 0 0 2rem 2rem;
+    }
+
+    .blog-meta {
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    .blog-content {
+        font-size: 1.1rem;
+        line-height: 1.8;
+        color: var(--secondary-color);
+    }
+
+    .author-image {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        border: 3px solid white;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        object-fit: cover;
+    }
+
+    .author-placeholder {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: var(--primary-color);
+        border: 3px solid white;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .like-button {
+        transition: all 0.3s ease;
+    }
+
+    .like-button:hover {
+        transform: scale(1.05);
+    }
+
+    .like-button.liked {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+
+    .navigation-link {
+        padding: 1rem;
+        border-radius: 1rem;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        color: var(--secondary-color);
+    }
+
+    .navigation-link:hover {
+        background-color: rgba(255, 75, 110, 0.1);
+        color: var(--primary-color);
+    }
+
+    .navigation-link i {
+        transition: all 0.3s ease;
+    }
+
+    .navigation-link:hover i {
+        transform: translateX(-5px);
+    }
+
+    .navigation-link.next:hover i {
+        transform: translateX(5px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h1 class="card-title mb-4">{{ post.title }}</h1>
+            
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="d-flex align-items-center">
+                    {% if post.user.userprofile.profile_picture %}
+                        <img src="{{ post.user.userprofile.profile_picture.url }}" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;" alt="{{ post.user.username }}'s profile picture">
+                    {% else %}
+                        <div class="rounded-circle bg-light d-flex align-items-center justify-content-center me-2" style="width: 40px; height: 40px;">
+                            <i class="fas fa-user text-secondary"></i>
+                        </div>
+                    {% endif %}
+                    <div>
+                        <h6 class="mb-0">{{ post.user.username }}</h6>
+                        <small class="text-muted">{{ post.created_at|date:"F j, Y" }}</small>
+                    </div>
+                </div>
+                
+                {% if user == post.user %}
+                    <a href="{% url 'users:edit_blog_post' post.id %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-edit"></i> Edit Post
+                    </a>
+                {% endif %}
+            </div>
+            
+            <div class="blog-content mb-4">
+                {{ post.content|linebreaks }}
+            </div>
+            
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <button class="btn btn-outline-danger btn-sm me-2" id="likeButton" data-post-id="{{ post.id }}">
+                        <i class="fas fa-heart"></i>
+                        <span id="likeCount">{{ post.likes.count }}</span>
+                    </button>
+                    <small class="text-muted">
+                        {% if post.likes.count == 1 %}
+                            1 like
+                        {% else %}
+                            {{ post.likes.count }} likes
+                        {% endif %}
+                    </small>
+                </div>
+                
+                <div class="d-flex gap-2">
+                    {% if previous_post %}
+                        <a href="{% url 'users:blog_detail' previous_post.id %}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </a>
+                    {% endif %}
+                    
+                    {% if next_post %}
+                        <a href="{% url 'users:blog_detail' next_post.id %}" class="btn btn-outline-primary btn-sm">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const likeButton = document.getElementById('likeButton');
+    const likeCount = document.getElementById('likeCount');
+    
+    likeButton.addEventListener('click', function() {
+        const postId = this.dataset.postId;
+        
+        fetch(`/users/blog/${postId}/like/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                likeCount.textContent = data.likes;
+                likeButton.classList.toggle('btn-danger');
+                likeButton.classList.toggle('btn-outline-danger');
+            }
+        });
+    });
+});
+</script>
+{% endblock %} 
